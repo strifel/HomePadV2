@@ -1,0 +1,87 @@
+esphome:
+  name: homepad
+  friendly_name: HomePad
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret encryption_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_secret
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Homepad Fallback Hotspot"
+    password: !secret fallback_hotspot
+
+captive_portal:
+    
+matrix_keypad:
+  id: mykeypad
+  columns:
+    - pin: GPIO5
+    - pin: GPIO6
+    - pin: GPIO7
+    - pin: GPIO10
+  rows:
+    - pin: GPIO0
+    - pin: GPIO1
+    - pin: GPIO3
+    - pin: GPIO4
+  keys: "789A456B123#C0*D"
+  has_diodes: true
+
+key_collector:
+  - id: pincode_reader
+    source_id: mykeypad
+    end_keys: "#"
+    end_key_required: true
+    clear_keys: "*"
+    allowed_keys: "0123456789ABC"
+    timeout: 5s
+    on_result:
+      - text_sensor.template.publish:
+          id: input
+          state: !lambda "return x.c_str();"
+      - logger.log:
+          format: "input result: '%s', started by '%c', ended by '%c'"
+          args: [ 'x.c_str()', "(start == 0 ? '~' : start)", "(end == 0 ? '~' : end)" ]
+      - delay: 1s
+      - text_sensor.template.publish:
+          id: input
+          state: ""
+      
+
+text_sensor:
+  - platform: template
+    name: "input"
+    id: input
+
+
+light:
+  - platform: neopixelbus
+    id: status
+    type: GRB
+    variant: WS2812
+    pin: GPIO20
+    num_leds: 15
+    name: "Home Status"
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+      - addressable_scan:
+      
